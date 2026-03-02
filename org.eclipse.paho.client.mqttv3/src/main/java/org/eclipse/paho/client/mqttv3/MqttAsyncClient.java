@@ -27,6 +27,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.SocketFactory;
 import org.eclipse.paho.client.mqttv3.internal.ClientComms;
@@ -1422,13 +1423,17 @@ public class MqttAsyncClient implements IMqttAsyncClient {
 		// @Trace 500=Attempting to reconnect client: {0}
 		log.fine(CLASS_NAME, methodName, "500", new Object[] { this.clientId });
 		try {
-			connect(this.connOpts, this.userContext, new MqttReconnectActionListener(methodName));
+			IMqttToken connectToken = connect(this.connOpts, this.userContext, new MqttReconnectActionListener(methodName));
+			connectToken.waitForCompletion(TimeUnit.SECONDS.toMillis(this.connOpts.getConnectionTimeout()));
 		} catch (MqttSecurityException ex) {
 			// @TRACE 804=exception
 			log.fine(CLASS_NAME, methodName, "804", null, ex);
 		} catch (MqttException ex) {
 			// @TRACE 804=exception
 			log.fine(CLASS_NAME, methodName, "804", null, ex);
+			if (ex.getReasonCode() == MqttException.REASON_CODE_CLIENT_TIMEOUT) {
+				comms.shutdownConnection(null, ex);
+			}
 		}
 	}
 
